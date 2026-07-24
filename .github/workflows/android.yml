@@ -20,9 +20,13 @@ jobs:
 
       - name: Patch verbatim tool build in Makefile
         run: |
-          # Pass -std=c++20 and -I. so host compiler supports C++20 bitwise & range features
           MAKEFILE=$(find . -maxdepth 2 -iname "makefile" | head -n 1)
           sed -i 's|\$(CXX) \$(VERBATIM_FLAGS) tools/verbatim.cpp|g++ -O3 -std=c++20 -I. tools/verbatim.cpp|' "$MAKEFILE"
+
+      - name: Patch static_vector.h for C++20 comparison support
+        run: |
+          HEADER=$(find . -name "static_vector.h")
+          sed -i '1i #include <compare>' "$HEADER"
 
       - name: Build
         run: |
