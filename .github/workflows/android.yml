@@ -18,17 +18,16 @@ jobs:
           unzip -q android-ndk-r26d-linux.zip
           echo "ANDROID_NDK_HOME=$PWD/android-ndk-r26d" >> $GITHUB_ENV
 
-      - name: Patch verbatim tool to use host compiler
+      - name: Patch verbatim tool build in Makefile
         run: |
-          # Finds Makefile regardless of root/src location or casing (Makefile vs makefile)
+          # Ensure host verbatim tool builds for x86_64 host without ARM flags
           MAKEFILE=$(find . -maxdepth 2 -iname "makefile" | head -n 1)
-          echo "Found Makefile at: $MAKEFILE"
-          sed -i 's|\$(CXX) \$(VERBATIM_FLAGS) tools/verbatim.cpp|g++ $(VERBATIM_FLAGS) tools/verbatim.cpp|' "$MAKEFILE"
+          sed -i 's|\$(CXX) \$(VERBATIM_FLAGS) tools/verbatim.cpp|g++ -O3 tools/verbatim.cpp|' "$MAKEFILE"
 
       - name: Build
         run: |
           cd src
-          make release ARCH=neon-dotprod \
+          make release ARCH=aarch64 \
               CXX=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++ \
               EXTRA_CXXFLAGS="-static-libstdc++" \
               EXTRA_LDFLAGS="-static-libstdc++"
