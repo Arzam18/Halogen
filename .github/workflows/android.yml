@@ -23,10 +23,10 @@ jobs:
           MAKEFILE=$(find . -maxdepth 2 -iname "makefile" | head -n 1)
           sed -i 's|\$(CXX) \$(VERBATIM_FLAGS) tools/verbatim.cpp|g++ -O3 -std=c++20 -I. tools/verbatim.cpp|' "$MAKEFILE"
 
-      - name: Patch static_vector.h for C++20 comparison support
+      - name: Patch missing lexicographical_compare_three_way in Android libc++
         run: |
           HEADER=$(find . -name "static_vector.h")
-          sed -i '1i #include <compare>' "$HEADER"
+          sed -i 's|std::lexicographical_compare_three_way|std::lexicographical_compare|g' "$HEADER"
 
       - name: Build
         run: |
