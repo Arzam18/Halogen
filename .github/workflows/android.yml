@@ -36,15 +36,18 @@ jobs:
               EXTRA_CXXFLAGS="-static-libstdc++" \
               EXTRA_LDFLAGS="-static-libstdc++"
 
-      - name: List build output
+      - name: Find binary and copy to root
         run: |
-          find . -type f -name "Halogen*" -executable
+          # Finds the compiled binary and copies it to a predictable location
+          BINARY=$(find . -type f -name "Halogen*" -executable | head -n 1)
+          echo "Found binary at: $BINARY"
+          cp "$BINARY" ./Halogen-android-arm64
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: halogen-android-arm64
-          path: src/bin/Halogen*
+          path: Halogen-android-arm64
 
       - name: Create prerelease
         uses: softprops/action-gh-release@v2
@@ -52,6 +55,6 @@ jobs:
           tag_name: android-build-${{ github.run_number }}
           name: Halogen Build ${{ github.run_number }}
           prerelease: true
-          files: src/bin/Halogen*
+          files: Halogen-android-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
