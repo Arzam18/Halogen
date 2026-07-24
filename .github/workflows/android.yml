@@ -20,9 +20,9 @@ jobs:
 
       - name: Patch verbatim tool build in Makefile
         run: |
-          # Ensure host verbatim tool builds for x86_64 host without ARM flags
+          # Keep -I. so host compiler can find headers, but omit ARM architecture flags
           MAKEFILE=$(find . -maxdepth 2 -iname "makefile" | head -n 1)
-          sed -i 's|\$(CXX) \$(VERBATIM_FLAGS) tools/verbatim.cpp|g++ -O3 tools/verbatim.cpp|' "$MAKEFILE"
+          sed -i 's|\$(CXX) \$(VERBATIM_FLAGS) tools/verbatim.cpp|g++ -O3 -I. tools/verbatim.cpp|' "$MAKEFILE"
 
       - name: Build
         run: |
