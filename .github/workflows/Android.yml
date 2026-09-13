@@ -23,7 +23,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$PWD/android-ndk-r26d" >> $GITHUB_ENV
           echo "$PWD/android-ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
-      - name: Locate Makefile and Prepare NNUE Network File
+      - name: Locate Makefile and Download NNUE File
         run: |
           MAKEFILE_PATH=$(find . -maxdepth 3 -iname "makefile" -o -iname "Makefile" | head -n 1)
           if [ -z "$MAKEFILE_PATH" ]; then
@@ -32,22 +32,14 @@ jobs:
           fi
           MAKEFILE_DIR=$(dirname "$MAKEFILE_PATH")
           echo "MAKEFILE_DIR=$MAKEFILE_DIR" >> $GITHUB_ENV
-          echo "Found Makefile at: $MAKEFILE_PATH"
 
-          # Ensure verbatim.nn is present in the compilation folder
-          if [ -f "verbatim.nn" ]; then
-            cp verbatim.nn "$MAKEFILE_DIR/"
-          elif [ -f "nn/verbatim.nn" ]; then
-            cp nn/verbatim.nn "$MAKEFILE_DIR/"
-          else
-            echo "Searching for verbatim.nn..."
-            NN_PATH=$(find . -iname "verbatim.nn" | head -n 1)
-            if [ -n "$NN_PATH" ]; then
-              cp "$NN_PATH" "$MAKEFILE_DIR/verbatim.nn"
-            else
-              echo "::error:: verbatim.nn not found in repository."
-              exit 1
-            fi
+          # Download verbatim.nn directly into the compilation directory (src/)
+          # Replace the URL below with your actual verbatim.nn download link if hosted elsewhere:
+          curl -fL -o "$MAKEFILE_DIR/verbatim.nn" "https://github.com/K3-A/Halogen/releases/download/v11.0/verbatim.nn"
+          
+          if [ ! -s "$MAKEFILE_DIR/verbatim.nn" ]; then
+            echo "::error:: verbatim.nn download failed or file is empty."
+            exit 1
           fi
 
       - name: Build Halogen (Standard ARMv8)
