@@ -14,13 +14,35 @@ jobs:
         with:
           submodules: recursive
 
+      # Locate the Makefile by its actual content rather than assuming a path. Archimedes'
+      # simplified fork Makefile is unique in this repo in that it defines MODULE = Halogen —
+      # the original upstream Halogen Makefile does not have that line. This avoids the
+      # "No rule to make target 'build'" failure that happens when `make` picks up a
+      # different Makefile than the one intended (e.g. an old copy left at repo root, or the
+      # fork's Makefile actually living in a subdirectory).
+      - name: Locate Archimedes Makefile
+        id: locate-makefile
+        run: |
+          echo "All Makefiles found in repo:"
+          find . -iname "Makefile"
+          echo "---"
+          MAKEFILE_PATH=$(grep -rl "MODULE = Halogen" --include="Makefile" . | head -n1)
+          if [ -z "$MAKEFILE_PATH" ]; then
+            echo "ERROR: no Makefile containing 'MODULE = Halogen' was found."
+            echo "The committed Makefile may still be the original upstream one, or named/placed differently than expected."
+            exit 1
+          fi
+          echo "Using Makefile: $MAKEFILE_PATH"
+          cat "$MAKEFILE_PATH"
+          echo "makefile_dir=$(dirname "$MAKEFILE_PATH")" >> "$GITHUB_OUTPUT"
+
       # This Makefile's DFLAGS reference verbatim.nn directly (no build step generates it),
       # so confirm it's actually present before spending time on a build that will fail at
       # the #include/incbin stage with a missing-file error.
       - name: Confirm network file is present
         run: |
-          find . -iname "verbatim.nn"
-          ls -la verbatim.nn || echo "WARNING: verbatim.nn not found at repo root — build will fail if the source expects it here"
+          cd "${{ steps.locate-makefile.outputs.makefile_dir }}"
+          ls -la verbatim.nn || echo "WARNING: verbatim.nn not found next to the Makefile — build will fail if the source expects it here"
 
       - name: Set up Android NDK
         id: setup-ndk
@@ -46,18 +68,19 @@ jobs:
           # Confirm PATH resolution picked up the NDK's clang++, not a system one, before building
           which clang++
           clang++ --version
+          cd "${{ steps.locate-makefile.outputs.makefile_dir }}"
           make build ARCH=armv8
 
       - name: Locate built binary
         run: |
-          find . -maxdepth 2 -iname "Halogen*" -type f
-          file Halogen || true
+          find "${{ steps.locate-makefile.outputs.makefile_dir }}" -maxdepth 1 -iname "Halogen*" -type f
+          file "${{ steps.locate-makefile.outputs.makefile_dir }}/Halogen" || true
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: halogen-android-arm64
-          path: Halogen
+          path: ${{ steps.locate-makefile.outputs.makefile_dir }}/Halogen
           if-no-files-found: error
 
       - name: Create prerelease
@@ -67,6 +90,6 @@ jobs:
           tag_name: android-build-${{ github.run_number }}
           name: Halogen Android build ${{ github.run_number }}
           prerelease: true
-          files: Halogen
+          files: ${{ steps.locate-makefile.outputs.makefile_dir }}/Halogen
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
