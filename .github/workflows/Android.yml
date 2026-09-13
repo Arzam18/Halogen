@@ -23,7 +23,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$PWD/android-ndk-r26d" >> $GITHUB_ENV
           echo "$PWD/android-ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
-      - name: Locate Makefile and Download NNUE File
+      - name: Locate Makefile and Fetch NNUE File
         run: |
           MAKEFILE_PATH=$(find . -maxdepth 3 -iname "makefile" -o -iname "Makefile" | head -n 1)
           if [ -z "$MAKEFILE_PATH" ]; then
@@ -33,14 +33,16 @@ jobs:
           MAKEFILE_DIR=$(dirname "$MAKEFILE_PATH")
           echo "MAKEFILE_DIR=$MAKEFILE_DIR" >> $GITHUB_ENV
 
-          # Download verbatim.nn directly into the compilation directory (src/)
-          # Replace the URL below with your actual verbatim.nn download link if hosted elsewhere:
-          curl -fL -o "$MAKEFILE_DIR/verbatim.nn" "https://github.com/K3-A/Halogen/releases/download/v11.0/verbatim.nn"
-          
-          if [ ! -s "$MAKEFILE_DIR/verbatim.nn" ]; then
-            echo "::error:: verbatim.nn download failed or file is empty."
+          # Fetch verbatim.nn direct download URL from upstream Halogen releases via GitHub API
+          NN_URL=$(curl -s https://api.github.com/repos/K3-A/Halogen/releases | grep -o 'https://[^"]*verbatim\.nn' | head -n 1)
+
+          if [ -z "$NN_URL" ]; then
+            echo "::error:: Could not find verbatim.nn asset URL from upstream releases."
             exit 1
           fi
+
+          echo "Downloading network from: $NN_URL"
+          curl -fL -o "$MAKEFILE_DIR/verbatim.nn" "$NN_URL"
 
       - name: Build Halogen (Standard ARMv8)
         run: |
