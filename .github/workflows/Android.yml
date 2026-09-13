@@ -22,27 +22,40 @@ jobs:
           unzip -q android-ndk-r26d-linux.zip
           echo "ANDROID_NDK_HOME=$PWD/android-ndk-r26d" >> $GITHUB_ENV
 
+      - name: Locate Makefile
+        run: |
+          MAKEFILE_PATH=$(find . -maxdepth 3 -iname "makefile" -o -iname "Makefile" | head -n 1)
+          if [ -z "$MAKEFILE_PATH" ]; then
+            echo "::error:: No Makefile found in repository."
+            exit 1
+          fi
+          MAKEFILE_DIR=$(dirname "$MAKEFILE_PATH")
+          echo "MAKEFILE_DIR=$MAKEFILE_DIR" >> $GITHUB_ENV
+          echo "Found Makefile at: $MAKEFILE_PATH"
+
       - name: Build Halogen (Standard ARMv8)
         run: |
           TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
           
+          cd ${{ env.MAKEFILE_DIR }}
           rm -f Halogen Halogen-* *.o
           make ARCH=armv8 \
             COMP=$TOOLCHAIN/aarch64-linux-android24-clang++ \
             STRIP=$TOOLCHAIN/llvm-strip
           
-          mv Halogen Halogen-armv8
+          mv Halogen $GITHUB_WORKSPACE/Halogen-armv8
 
       - name: Build Halogen (ARMv8.2 Dot Product)
         run: |
           TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
           
+          cd ${{ env.MAKEFILE_DIR }}
           rm -f Halogen Halogen-* *.o
           make ARCH=armv8-dotprod \
             COMP=$TOOLCHAIN/aarch64-linux-android29-clang++ \
             STRIP=$TOOLCHAIN/llvm-strip
           
-          mv Halogen Halogen-armv8-dotprod
+          mv Halogen $GITHUB_WORKSPACE/Halogen-armv8-dotprod
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
