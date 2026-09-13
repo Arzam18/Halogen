@@ -3,6 +3,7 @@ name: Build Halogen for Android
 on:
   push:
     branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
   build-android:
