@@ -23,7 +23,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$PWD/android-ndk-r26d" >> $GITHUB_ENV
           echo "$PWD/android-ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
-      - name: Locate Makefile
+      - name: Locate Makefile and Prepare NNUE Network File
         run: |
           MAKEFILE_PATH=$(find . -maxdepth 3 -iname "makefile" -o -iname "Makefile" | head -n 1)
           if [ -z "$MAKEFILE_PATH" ]; then
@@ -34,18 +34,40 @@ jobs:
           echo "MAKEFILE_DIR=$MAKEFILE_DIR" >> $GITHUB_ENV
           echo "Found Makefile at: $MAKEFILE_PATH"
 
+          # Ensure verbatim.nn is present in the compilation folder
+          if [ -f "verbatim.nn" ]; then
+            cp verbatim.nn "$MAKEFILE_DIR/"
+          elif [ -f "nn/verbatim.nn" ]; then
+            cp nn/verbatim.nn "$MAKEFILE_DIR/"
+          else
+            echo "Searching for verbatim.nn..."
+            NN_PATH=$(find . -iname "verbatim.nn" | head -n 1)
+            if [ -n "$NN_PATH" ]; then
+              cp "$NN_PATH" "$MAKEFILE_DIR/verbatim.nn"
+            else
+              echo "::error:: verbatim.nn not found in repository."
+              exit 1
+            fi
+          fi
+
       - name: Build Halogen (Standard ARMv8)
         run: |
           cd ${{ env.MAKEFILE_DIR }}
           rm -f Halogen Halogen-* *.o
-          make ARCH=armv8
+          
+          make ARCH=armv8 \
+            COMP=aarch64-linux-android28-clang++
+            
           mv Halogen $GITHUB_WORKSPACE/Halogen-armv8
 
       - name: Build Halogen (ARMv8.2 Dot Product)
         run: |
           cd ${{ env.MAKEFILE_DIR }}
           rm -f Halogen Halogen-* *.o
-          make ARCH=armv8-dotprod
+          
+          make ARCH=armv8-dotprod \
+            COMP=aarch64-linux-android29-clang++
+            
           mv Halogen $GITHUB_WORKSPACE/Halogen-armv8-dotprod
 
       - name: Upload Binaries
