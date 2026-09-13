@@ -1,16 +1,20 @@
-name: Halogen
+name: Build Halogen Chess Engine (Android ARM64)
 
 on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  build:
+  build-android:
+    name: Build Android ARM64
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Install Android NDK
         run: |
@@ -18,43 +22,32 @@ jobs:
           unzip -q android-ndk-r26d-linux.zip
           echo "ANDROID_NDK_HOME=$PWD/android-ndk-r26d" >> $GITHUB_ENV
 
-      - name: Patch verbatim tool build in Makefile
+      - name: Build Halogen (Standard ARMv8)
         run: |
-          MAKEFILE=$(find . -maxdepth 2 -iname "makefile" | head -n 1)
-          sed -i 's|\$(CXX) \$(VERBATIM_FLAGS) tools/verbatim.cpp|g++ -O3 -std=c++20 -I. tools/verbatim.cpp|' "$MAKEFILE"
+          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+          
+          make clean
+          make build ARCH=armv8 \
+            COMP=$TOOLCHAIN/aarch64-linux-android24-clang++ \
+            STRIP=$TOOLCHAIN/llvm-strip
+          
+          mv Halogen Halogen-armv8
 
-      - name: Patch missing lexicographical_compare_three_way in Android libc++
+      - name: Build Halogen (ARMv8.2 Dot Product)
         run: |
-          HEADER=$(find . -name "static_vector.h")
-          sed -i 's|std::lexicographical_compare_three_way|std::lexicographical_compare|g' "$HEADER"
+          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+          
+          make clean
+          make build ARCH=armv8-dotprod \
+            COMP=$TOOLCHAIN/aarch64-linux-android29-clang++ \
+            STRIP=$TOOLCHAIN/llvm-strip
+          
+          mv Halogen Halogen-armv8-dotprod
 
-      - name: Build
-        run: |
-          cd src
-          make release ARCH=aarch64 \
-              CXX=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang++ \
-              EXTRA_CXXFLAGS="-static-libstdc++" \
-              EXTRA_LDFLAGS="-static-libstdc++"
-
-      - name: Find binary and copy to root
-        run: |
-          # Finds the compiled binary and copies it to a predictable location
-          BINARY=$(find . -type f -name "Halogen*" -executable | head -n 1)
-          echo "Found binary at: $BINARY"
-          cp "$BINARY" ./Halogen-android-arm64
-
-      - name: Upload artifact
+      - name: Upload Binaries
         uses: actions/upload-artifact@v4
         with:
           name: halogen-android-arm64
-          path: Halogen-android-arm64
-
-      - name: Create prerelease
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-build-${{ github.run_number }}
-          name: Halogen Build ${{ github.run_number }}
-          prerelease: true
-          files: Halogen-android-arm64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: |
+            Halogen-armv8
+            Halogen-armv8-dotprod
