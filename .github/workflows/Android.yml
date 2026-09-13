@@ -26,8 +26,8 @@ jobs:
         run: |
           TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
           
-          rm -f Halogen *.o
-          make build ARCH=armv8 \
+          rm -f Halogen Halogen-* *.o
+          make ARCH=armv8 \
             COMP=$TOOLCHAIN/aarch64-linux-android24-clang++ \
             STRIP=$TOOLCHAIN/llvm-strip
           
@@ -37,8 +37,8 @@ jobs:
         run: |
           TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
           
-          rm -f Halogen *.o
-          make build ARCH=armv8-dotprod \
+          rm -f Halogen Halogen-* *.o
+          make ARCH=armv8-dotprod \
             COMP=$TOOLCHAIN/aarch64-linux-android29-clang++ \
             STRIP=$TOOLCHAIN/llvm-strip
           
