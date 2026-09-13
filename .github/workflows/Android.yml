@@ -21,6 +21,7 @@ jobs:
           wget -q https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
           unzip -q android-ndk-r26d-linux.zip
           echo "ANDROID_NDK_HOME=$PWD/android-ndk-r26d" >> $GITHUB_ENV
+          echo "$PWD/android-ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
       - name: Locate Makefile
         run: |
@@ -35,26 +36,16 @@ jobs:
 
       - name: Build Halogen (Standard ARMv8)
         run: |
-          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
-          
           cd ${{ env.MAKEFILE_DIR }}
           rm -f Halogen Halogen-* *.o
-          make ARCH=armv8 \
-            COMP=$TOOLCHAIN/aarch64-linux-android24-clang++ \
-            STRIP=$TOOLCHAIN/llvm-strip
-          
+          make ARCH=armv8
           mv Halogen $GITHUB_WORKSPACE/Halogen-armv8
 
       - name: Build Halogen (ARMv8.2 Dot Product)
         run: |
-          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
-          
           cd ${{ env.MAKEFILE_DIR }}
           rm -f Halogen Halogen-* *.o
-          make ARCH=armv8-dotprod \
-            COMP=$TOOLCHAIN/aarch64-linux-android29-clang++ \
-            STRIP=$TOOLCHAIN/llvm-strip
-          
+          make ARCH=armv8-dotprod
           mv Halogen $GITHUB_WORKSPACE/Halogen-armv8-dotprod
 
       - name: Upload Binaries
