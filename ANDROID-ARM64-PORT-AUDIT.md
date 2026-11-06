@@ -68,3 +68,30 @@ Both use `-O3`, LTO, section garbage collection, static C++ runtime linkage, 16 
 ## Network provenance
 
 The build script downloads `ed164cf2.nn` from the Halogen Networks GitHub release URL encoded in the upstream Makefile and embeds the architecture-preprocessed network in each executable. No substitute network or synthetic weights are included in the release artifacts.
+
+## Stage 1 Fix 1 — permission-independent script invocation
+
+The first GitHub Actions run downloaded the official network successfully, then stopped at
+`scripts/build-android-arm64.sh: line 35` with `Permission denied` while launching
+`scripts/test-simd-contracts.sh` directly. Although the supplied ZIP recorded the helper as
+executable, direct ZIP extraction or uploading files into a Git repository can lose the
+executable bit. The same risk applied to the final verifier.
+
+Fix:
+
+- The build script now invokes both helper scripts explicitly through `bash`:
+  `bash "$ROOT/scripts/test-simd-contracts.sh"` and
+  `bash "$ROOT/scripts/verify-android-arm64.sh" ...`.
+- This removes dependence on executable mode for these helper scripts. The workflow already
+  invokes the main build script with `bash`, so the complete chain is permission-independent.
+- The helper scripts are deliberately stored as ordinary readable files in the ZIP; no
+  `chmod` operation or repository mode change is required.
+
+Validation for Fix 1:
+
+- `bash -n` passed for all three Halogen scripts.
+- The SIMD contract helper passed when its own file mode was set to `0644` and it was invoked
+  through `bash`.
+- GCC and Clang arithmetic contract suites passed in that permission-independent mode.
+- The Android NDK build still requires a rerun in GitHub Actions; this fix addresses the
+  observed script-launch failure and does not claim that the Android binaries have built.
