@@ -1,1 +1,58 @@
+name: Halogen Android ARM64 NEON + Dotprod
 
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Halogen
+        uses: actions/checkout@v4
+
+      - name: Install Android NDK r27c
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: false
+
+      - name: Verify SIMD arithmetic contracts with GCC and Clang
+        shell: bash
+        run: |
+          HOST_CXX=g++ bash scripts/test-simd-contracts.sh
+          HOST_CXX=clang++ bash scripts/test-simd-contracts.sh
+
+      - name: Build both Android ARM64 variants
+        shell: bash
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+          HOST_CXX: g++
+        run: bash scripts/build-android-arm64.sh
+
+      - name: Upload ARM64 NEON build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Halogen-android-arm64-neon
+          path: artifacts/arm64-neon/
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload ARM64 Dotprod build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Halogen-android-arm64-dotprod
+          path: artifacts/arm64-dotprod/
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload network layout and diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: Halogen-android-arm64-build-diagnostics
+          path: artifacts/network-layout-SHA256SUMS.txt
+          if-no-files-found: error
