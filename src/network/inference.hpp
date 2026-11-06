@@ -50,7 +50,11 @@ void FT_activation(const std::array<int16_t, FT_SIZE>& stm_king_square,
         // correct result in all cases. For this to work, we need to make sure the int32 won't overflow, with
         // (-255) * 1.98 * (32+1) * 255 * 2^7 = -500M we are safe.
 
-        // On NEON, vqdmulhq_s16 computes (a << 1) * b >> 16, so we adjust the left shift accordingly.
+        // On NEON, vqdmulhq_s16 computes ((a << 1) * b) >> 16. Using a
+        // six-bit shift here is exactly equivalent to the x86 seven-bit shift
+        // followed by pmulhw: ((x << 6) * b * 2) >> 16 == ((x << 7) * b) >> 16.
+        // Inputs are clamped to [0, 255], so the doubling operation cannot
+        // saturate; this preserves the trained network's integer activations.
 
         auto stm_king_piece1 = SIMD::load(&stm_king_square[i]);
         auto stm_king_piece2 = SIMD::load(&stm_king_square[i + stride]);
