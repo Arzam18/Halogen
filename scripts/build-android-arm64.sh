@@ -32,7 +32,7 @@ EXTRA_CXXFLAGS="-DHALOGEN_ANDROID_BUILD=1 -g0 -fomit-frame-pointer -ffunction-se
 EXTRA_LDFLAGS="-static-libstdc++ -Wl,--gc-sections -Wl,-z,max-page-size=16384"
 
 HOST_CXX="${HOST_CXX:-g++}"
-"$ROOT/scripts/test-simd-contracts.sh"
+bash "$ROOT/scripts/test-simd-contracts.sh"
 
 build_one() {
   local arch="$1"
@@ -75,7 +75,7 @@ cmp -s "$NEON_NET" "$DOTPROD_NET" || {
 }
 sha256sum "$NEON_NET" > "$ROOT/artifacts/network-layout-SHA256SUMS.txt"
 
-"$ROOT/scripts/verify-android-arm64.sh" \
+bash "$ROOT/scripts/verify-android-arm64.sh" \
   "$ROOT/artifacts/arm64-neon/arm64-neon" \
   "$ROOT/artifacts/arm64-dotprod/arm64-dotprod" \
   "$LLVM_BIN"
