@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -16,11 +17,32 @@ template <typename T>
 T* allocate_huge_page(std::size_t size)
 {
 #ifdef __linux__
-    // Use 2MB transparent huge pages
+    // Use 2MB transparent huge pages where the OS supports them. Android's
+    // bionic only added aligned_alloc() at API 28; this project targets API 24,
+    // so use the older POSIX allocator on Android while retaining the same
+    // alignment and allocation size.
     constexpr static auto huge_page_size = 2 * 1024 * 1024;
     size = ((size + huge_page_size - 1) / huge_page_size) * huge_page_size;
+#ifdef __ANDROID__
+    void* allocation = nullptr;
+    // 2 MiB alignment is a performance hint, not a correctness requirement.
+    // If that large alignment cannot be reserved, retry with the type's
+    // required alignment so low-memory Android devices can still start.
+    if (posix_memalign(&allocation, huge_page_size, size) != 0)
+    {
+        constexpr std::size_t fallback_alignment = alignof(T) < sizeof(void*) ? sizeof(void*) : alignof(T);
+        if (posix_memalign(&allocation, fallback_alignment, size) != 0)
+        {
+            return nullptr;
+        }
+    }
+    T* data = static_cast<T*>(allocation);
+#else
     T* data = static_cast<T*>(std::aligned_alloc(huge_page_size, size));
-    madvise(data, size, MADV_HUGEPAGE);
+#endif
+#ifdef MADV_HUGEPAGE
+    (void)madvise(data, size, MADV_HUGEPAGE);
+#endif
     return data;
 #elif defined(_WIN32)
     // 1. Obtain the SeLockMemoryPrivilege privilege by calling the AdjustTokenPrivileges function. For more
