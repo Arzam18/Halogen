@@ -1,5 +1,15 @@
 #pragma once
 
+// Keep the compile-time ISA declaration honest. In particular, never let a
+// build define the Dotprod code path while the target compiler is emitting a
+// baseline ARMv8-A binary without the SDOT extension.
+#if defined(USE_NEON) && !defined(__aarch64__)
+#error "Halogen Android NEON builds must target AArch64"
+#endif
+#if defined(USE_NEON_DOTPROD) && !defined(__ARM_FEATURE_DOTPROD)
+#error "USE_NEON_DOTPROD requires compiler target support for ARM dot-product instructions"
+#endif
+
 #if defined(USE_SSE4)
 #include <immintrin.h>
 #endif
