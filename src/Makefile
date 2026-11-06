@@ -71,6 +71,8 @@ endif
 
 $(info Detected OS: $(DETECTED_OS))
 
+HOST_CXX ?= c++
+
 CXX_VERSION := $(shell $(CXX) --version 2>/dev/null)
 ifneq ($(findstring clang,$(CXX_VERSION)),)
     COMPILER := clang
@@ -203,13 +205,22 @@ endif
 # armv8
 ifeq ($(ARCH),neon)
     ARCH_DEFINES := -DUSE_NEON
-    ARCH_MARCH := -march=armv8-a+simd
+    ARCH_MARCH := -march=armv8-a+simd -mtune=cortex-a76
 endif
 
 # armv8.2
 ifeq ($(ARCH),neon-dotprod)
     ARCH_DEFINES := -DUSE_NEON -DUSE_NEON_DOTPROD
-    ARCH_MARCH := -march=armv8.2-a+dotprod
+    ARCH_MARCH := -march=armv8.2-a+dotprod -mtune=cortex-a76
+endif
+
+# The network converter is a host executable, even when the engine itself is
+# cross-compiled. ARM NEON uses 128-bit vectors and the same weight layout as
+# SSE4, so compile the converter natively with a 16-byte SIMD layout instead
+# of trying to execute an Android/AArch64 binary on the build host.
+VERBATIM_ARCH_DEFINES := $(ARCH_DEFINES)
+ifneq ($(filter neon neon-dotprod,$(ARCH)),)
+    VERBATIM_ARCH_DEFINES := -DUSE_SSE4 -DHALOGEN_NEON_PREPROCESS_HOST
 endif
 
 $(info Building for architecture: $(ARCH))
@@ -249,7 +260,7 @@ ifeq ($(MAKECMDGOALS),debug)
     BUILD_TYPE := debug
     CXXFLAGS += $(OPT_NONE) $(BASE_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH)
     LDFLAGS += $(BASE_LDFLAGS)
-    VERBATIM_FLAGS := $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-$(ARCH)-debug
 endif
 
@@ -258,7 +269,7 @@ ifeq ($(MAKECMDGOALS),release)
     BUILD_TYPE := release
     CXXFLAGS += $(OPT_RELEASE) $(BASE_FLAGS) $(LTO_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH)
     LDFLAGS += $(BASE_LDFLAGS) $(LTO_FLAGS) $(STATIC_LDFLAGS)
-    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-$(ARCH)
 endif
 
@@ -267,7 +278,7 @@ ifeq ($(MAKECMDGOALS),sanitize-address)
     BUILD_TYPE := sanitize-address
     CXXFLAGS += $(OPT_SANITIZE) $(BASE_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) -fsanitize=address
     LDFLAGS += $(BASE_LDFLAGS) -fsanitize=address
-    VERBATIM_FLAGS := $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-$(ARCH)-asan
 endif
 
@@ -275,7 +286,7 @@ ifeq ($(MAKECMDGOALS),sanitize-undefined)
     BUILD_TYPE := sanitize-undefined
     CXXFLAGS += $(OPT_SANITIZE) $(BASE_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) -fsanitize=undefined
     LDFLAGS += $(BASE_LDFLAGS) -fsanitize=undefined
-    VERBATIM_FLAGS := $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-$(ARCH)-ubsan
 endif
 
@@ -283,7 +294,7 @@ ifeq ($(MAKECMDGOALS),sanitize-thread)
     BUILD_TYPE := sanitize-thread
     CXXFLAGS += $(OPT_SANITIZE) $(BASE_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) -fsanitize=thread
     LDFLAGS += $(BASE_LDFLAGS) -fsanitize=thread
-    VERBATIM_FLAGS := $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-$(ARCH)-tsan
 endif
 
@@ -292,7 +303,7 @@ ifeq ($(MAKECMDGOALS),tune)
     BUILD_TYPE := tune
     CXXFLAGS += $(OPT_RELEASE) $(BASE_FLAGS) $(LTO_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) -DTUNE
     LDFLAGS += $(BASE_LDFLAGS) $(LTO_FLAGS)
-    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-tune
 endif
 
@@ -301,7 +312,7 @@ ifeq ($(MAKECMDGOALS),shuffle)
     BUILD_TYPE := shuffle
     CXXFLAGS += $(OPT_RELEASE) $(BASE_FLAGS) $(LTO_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) -fopenmp -DNETWORK_SHUFFLE
     LDFLAGS += $(BASE_LDFLAGS) $(LTO_FLAGS) -fopenmp
-    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(ARCH_DEFINES) -DNETWORK_SHUFFLE
+    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES) -DNETWORK_SHUFFLE
     EXE := $(BINARY_DIR)/$(PROJECT)-shuffle
 endif
 
@@ -310,7 +321,7 @@ ifeq ($(MAKECMDGOALS),analyze)
     BUILD_TYPE := analyze
     CXXFLAGS += $(OPT_NONE) $(BASE_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH)
     LDFLAGS += $(BASE_LDFLAGS)
-    VERBATIM_FLAGS := $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
 endif
 
 # Tournament build
@@ -318,7 +329,7 @@ ifeq ($(MAKECMDGOALS),tournament)
     BUILD_TYPE := tournament
     CXXFLAGS += $(OPT_RELEASE) $(BASE_FLAGS) $(LTO_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) -DTOURNAMENT_MODE
     LDFLAGS += $(BASE_LDFLAGS) $(LTO_FLAGS) -lnuma
-    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-tournament
 endif
 
@@ -327,7 +338,7 @@ ifeq ($(MAKECMDGOALS),pgo-instrumented)
     BUILD_TYPE := pgo-instrumented
     CXXFLAGS += $(OPT_RELEASE) $(BASE_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) $(PGO_GEN) -fno-lto
     LDFLAGS += $(BASE_LDFLAGS) $(PGO_GEN) -fno-lto
-    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BUILD_DIR)/$(ARCH)/$(PROJECT)-pgo-instrumented
 endif
 
@@ -336,7 +347,7 @@ ifeq ($(MAKECMDGOALS),pgo-compile)
     BUILD_TYPE := pgo-compile
     CXXFLAGS += $(OPT_RELEASE) $(BASE_FLAGS) $(LTO_FLAGS) $(ARCH_DEFINES) $(ARCH_MARCH) $(PGO_USE)
     LDFLAGS += $(BASE_LDFLAGS) $(LTO_FLAGS) $(PGO_USE) $(STATIC_LDFLAGS)
-    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(ARCH_DEFINES)
+    VERBATIM_FLAGS := $(OPT_RELEASE) $(BASE_FLAGS) $(VERBATIM_ARCH_DEFINES)
     EXE := $(BINARY_DIR)/$(PROJECT)-pgo
 endif
 
@@ -355,7 +366,7 @@ endif
 # a stamp file that every object depends on. Switching build type, ARCH, compiler, network or
 # EXTRA_CXXFLAGS rewrites the stamp and rebuilds everything; repeating a build leaves it untouched.
 FLAGS_STAMP := $(BUILD_DIR)/$(ARCH)/flags.stamp
-FLAGS_FINGERPRINT := $(CXX) $(CXXFLAGS) $(LDFLAGS) $(VERBATIM_FLAGS) $(EVALFILE)
+FLAGS_FINGERPRINT := $(CXX) $(CXXFLAGS) $(LDFLAGS) HOST_CXX=$(HOST_CXX) $(VERBATIM_FLAGS) $(EVALFILE)
 $(shell mkdir -p $(dir $(FLAGS_STAMP)); test "$$(cat $(FLAGS_STAMP) 2>/dev/null)" = '$(FLAGS_FINGERPRINT)' \
         || printf '%s' '$(FLAGS_FINGERPRINT)' > $(FLAGS_STAMP))
 
@@ -384,7 +395,7 @@ $(EVALFILE):
 ifdef NO_EVALFILE_SET
 	@ mkdir -p $(dir $@)
 	$(info Downloading default network $(NET_HASH).nn)
-	curl -sL https://github.com/KierenP/Halogen-Networks/releases/download/$(NET_HASH)/$(NET_HASH).nn > $(EVALFILE)
+	curl --fail --location --retry 3 --retry-delay 2 https://github.com/KierenP/Halogen-Networks/releases/download/$(NET_HASH)/$(NET_HASH).nn -o $(EVALFILE)
 endif
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -395,7 +406,7 @@ VERBATIM := $(BUILD_DIR)/$(ARCH)/verbatim$(HOST_EXE_SUFFIX)
 
 $(VERBATIM): tools/verbatim.cpp $(FLAGS_STAMP)
 	@ mkdir -p $(dir $@)
-	$(CXX) $(VERBATIM_FLAGS) tools/verbatim.cpp -o $@ $(BASE_LDFLAGS)
+	$(HOST_CXX) $(VERBATIM_FLAGS) tools/verbatim.cpp -o $@ $(BASE_LDFLAGS)
 
 # The stamp carries EVALFILE, so pointing at a different net re-runs verbatim even when that net's
 # mtime is older than the last build.
